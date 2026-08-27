@@ -1,19 +1,56 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Verify a document — Acheva</title>
     <meta
       name="description"
       content="Check that an Acheva result sheet or statement of results is genuine."
     />
-    <!-- A verification page has nothing to gain from being indexed, and a
-         crawler walking serials is exactly what we do not want. -->
+    <!-- A verifier has nothing to gain from being indexed, and a crawler
+         walking serials is precisely what we do not want. -->
     <meta name="robots" content="noindex, nofollow" />
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/config.js"></script>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <main>
+      <p class="brand">ACHEVA</p>
+      <h1>Verify a document</h1>
+      <p class="lede">
+        Enter the serial printed at the foot of a result sheet or statement of
+        results, or scan its QR code. You will see the document exactly as
+        Acheva issued it, so you can check it against the copy in your hand.
+      </p>
+
+      <form id="verify-form" autocomplete="off">
+        <label class="visually-hidden" for="serial">Document serial</label>
+        <input
+          id="serial"
+          name="serial"
+          type="text"
+          inputmode="latin"
+          autocapitalize="characters"
+          spellcheck="false"
+          placeholder="ACV-7F3A-92BD-4KX2"
+        />
+        <button id="submit" type="submit">Verify</button>
+      </form>
+
+      <!-- Announced politely so a screen reader hears the verdict without
+           losing the reader's place in the form. -->
+      <div id="output" aria-live="polite"></div>
+
+      <footer>
+        <p>
+          Acheva records every document it issues. This page shows what was
+          issued — it is not a substitute for the institution&rsquo;s official
+          transcript.
+        </p>
+      </footer>
+    </main>
+
+    <script src="/app.js"></script>
   </body>
 </html>

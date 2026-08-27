@@ -1,0 +1,3 @@
+# Netlify: every path serves the app, so /ACV-7F3A-92BD-4KX2 (what a QR opens)
+# reaches index.html instead of 404ing.
+/*  /index.html  200
