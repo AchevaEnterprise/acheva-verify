@@ -285,6 +285,188 @@
     return grid;
   }
 
+  /**
+   * One issued document, rendered as whichever kind it is.
+   *
+   * The two kinds answer different questions — a result sheet is one course
+   * across a class, a transcript is one student across their whole record —
+   * so they get different renderers rather than one that half-fits both.
+   */
+  function renderDocument(result) {
+    return result.kind === 'TRANSCRIPT'
+      ? renderTranscript(result.document)
+      : renderSheet(result.document);
+  }
+
+  /** Blank, not 0, when a row carries no grade points — 0 is what an F earns. */
+  function points(value) {
+    return value === null || value === undefined ? '' : String(value);
+  }
+
+  /**
+   * The student academic record.
+   *
+   * Laid out in the same order as the printed page — header block, then the
+   * grades session by session, then the totals — because the reader is
+   * holding the paper and comparing it line by line. A tidier arrangement
+   * that did not match the document would make the only task this page exists
+   * for harder.
+   */
+  function renderTranscript(transcript) {
+    var section = el('section', 'sheet');
+    var student = transcript.student || {};
+
+    var head = el('div', 'sheet__head');
+    head.appendChild(el('h2', null, (transcript.institution || '').toUpperCase()));
+    head.appendChild(el('p', null, "STUDENT'S ACADEMIC RECORD"));
+    section.appendChild(head);
+
+    // Only the fields the document actually carries. A row of em-dashes for
+    // things the school never recorded would look like missing data rather
+    // than data that was never collected.
+    var meta = el('dl', 'meta');
+    [
+      ['Name of Student', (student.fullName || '').toUpperCase()],
+      ['Reg. No.', student.registrationNumber],
+      ['Sex', student.sex],
+      ['Date of Birth', student.dateOfBirth ? formatDate(student.dateOfBirth) : ''],
+      // Upper-cased to match the printed page exactly — this screen exists to
+      // be read side by side with the paper, and a casing difference is one
+      // more thing for the reader to have to dismiss.
+      ['Nationality', (student.nationality || '').toUpperCase()],
+      ['State of Origin', (student.stateOfOrigin || '').toUpperCase()],
+      ['Date of Entry', student.dateOfEntry],
+      ['Mode of Entry', (student.modeOfEntry || '').toUpperCase()],
+      ['School', (student.school || '').toUpperCase()],
+      ['Department', (student.department || '').toUpperCase()],
+      ['Option', (student.programmeOption || '').toUpperCase()],
+    ].forEach(function (pair) {
+      if (!pair[1]) return;
+      var row = el('div');
+      row.appendChild(el('dt', null, pair[0] + ':'));
+      row.appendChild(el('dd', null, pair[1]));
+      meta.appendChild(row);
+    });
+    section.appendChild(meta);
+
+    var scroller = el('div', 'table-scroll');
+    var table = el('table');
+
+    var thead = el('thead');
+    var headRow = el('tr');
+    ['Course Code', 'Title of Course', 'Units', 'Grade', 'Total Grade Points']
+      .forEach(function (label, index) {
+        headRow.appendChild(el('th', index >= 2 ? 'num' : '', label));
+      });
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    var tbody = el('tbody');
+    (transcript.sessions || []).forEach(function (session) {
+      if (session.broughtForward) {
+        tbody.appendChild(
+          totalRow('Brought forward', session.broughtForward, false)
+        );
+      }
+
+      (session.semesters || []).forEach(function (semester) {
+        var heading = el('tr');
+        var cell = el('th', 'name', semester.heading);
+        cell.colSpan = 5;
+        heading.appendChild(cell);
+        tbody.appendChild(heading);
+
+        (semester.courses || []).forEach(function (course) {
+          // A held row is dimmed the same way a voided sheet row is, so the
+          // two documents signal "this does not count" identically.
+          var row = el('tr', course.counted ? null : 'voided');
+          row.appendChild(el('td', '', course.code));
+          row.appendChild(
+            el(
+              'td',
+              'name',
+              course.title +
+                (course.moderated ? ' †' : '') +
+                (course.counted ? '' : ' ‡')
+            )
+          );
+          row.appendChild(el('td', 'num', points(course.units)));
+          row.appendChild(el('td', 'num', course.grade || ''));
+          row.appendChild(el('td', 'num', points(course.gradePoints)));
+          tbody.appendChild(row);
+        });
+      });
+
+      if ((transcript.sessions || []).length > 1) {
+        tbody.appendChild(
+          totalRow('TOTAL AS AT ' + session.session, session.cumulative, true)
+        );
+      }
+    });
+
+    tbody.appendChild(totalRow('TOTAL', transcript.cumulative, true));
+    table.appendChild(tbody);
+    scroller.appendChild(table);
+    section.appendChild(scroller);
+
+    section.appendChild(renderTranscriptFooter(transcript));
+    return section;
+  }
+
+  /** A units / grade-points line, with the CGPA when it is a running total. */
+  function totalRow(label, totals, withGpa) {
+    var row = el('tr');
+    row.appendChild(el('td', '', ''));
+    row.appendChild(el('td', 'name', label));
+    row.appendChild(el('td', 'num', String(totals.units)));
+    row.appendChild(el('td', 'num', withGpa ? 'CGPA ' + totals.gpa.toFixed(2) : ''));
+    row.appendChild(el('td', 'num', String(totals.gradePoints)));
+    return row;
+  }
+
+  function renderTranscriptFooter(transcript) {
+    var grid = el('div', 'footer-grid');
+
+    var totals = el('div');
+    totals.appendChild(el('h3', null, 'Totals'));
+    var stats = el('ul', 'tally');
+    [
+      ['Units', String(transcript.cumulative.units)],
+      ['Grade points', String(transcript.cumulative.gradePoints)],
+      ['CGPA', transcript.cumulative.gpa.toFixed(2)],
+    ].forEach(function (pair) {
+      stats.appendChild(el('li', null, pair[0] + ': ' + pair[1]));
+    });
+    totals.appendChild(stats);
+    grid.appendChild(totals);
+
+    var about = el('div');
+    about.appendChild(el('h3', null, 'About this document'));
+    var list = el('ul');
+    if (transcript.courseAdvisor) {
+      list.appendChild(el('li', null, 'Course Advisor: ' + transcript.courseAdvisor));
+    }
+    list.appendChild(el('li', null, 'Compiled ' + formatDate(transcript.generatedAt)));
+    // The same statement the PDF carries. A verifier who reached this page
+    // from a QR has not necessarily read the document's own small print.
+    list.appendChild(
+      el(
+        'li',
+        null,
+        "Not the Registrar's official transcript — compiled from results " +
+          'published through the departmental approval chain.'
+      )
+    );
+    about.appendChild(list);
+    grid.appendChild(about);
+
+    (transcript.notices || []).forEach(function (notice) {
+      grid.appendChild(el('p', 'note', notice));
+    });
+
+    return grid;
+  }
+
   function renderError(message) {
     var box = el('div', 'verdict');
     box.appendChild(el('h2', null, 'Could not check this serial'));
@@ -327,7 +509,7 @@
 
         var fragment = document.createDocumentFragment();
         fragment.appendChild(renderVerdict(result));
-        if (result.document) fragment.appendChild(renderSheet(result.document));
+        if (result.document) fragment.appendChild(renderDocument(result));
         show(fragment);
       })
       .catch(function (error) {
