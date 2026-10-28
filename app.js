@@ -513,9 +513,13 @@
         show(fragment);
       })
       .catch(function (error) {
+        // Only the messages thrown above are written for people. A network
+        // failure is a TypeError ("Failed to fetch") and a malformed body a
+        // SyntaxError — browser wording that must never reach the page.
+        var raw = error instanceof TypeError || error instanceof SyntaxError;
         show(
           renderError(
-            error && error.message
+            error && error.message && !raw
               ? error.message
               : 'No connection to Acheva. Check your network and try again.'
           )
